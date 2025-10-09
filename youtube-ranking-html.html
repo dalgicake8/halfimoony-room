@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>유튜브 구독자 순위</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.5.0/Recharts.js"></script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-red-50 via-white to-red-50 min-h-screen">
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">
+                🏆 유튜브 구독자 순위
+            </h1>
+            <p class="text-gray-600">실시간 업데이트 중...</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+            <div class="flex flex-col md:flex-row gap-4">
+                <!-- Search -->
+                <div class="flex-1 relative">
+                    <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="채널 검색..."
+                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                </div>
+
+                <!-- Category Filter -->
+                <select id="categoryFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <option value="전체">전체</option>
+                    <option value="음악">음악</option>
+                    <option value="엔터테인먼트">엔터테인먼트</option>
+                    <option value="교육">교육</option>
+                    <option value="스포츠">스포츠</option>
+                    <option value="영화">영화</option>
+                </select>
+
+                <!-- Sort -->
+                <select id="sortBy" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <option value="subscribers">구독자순</option>
+                    <option value="views">조회수순</option>
+                    <option value="change">증가율순</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Ranking List -->
+        <div id="rankingList" class="space-y-4"></div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-sm text-gray-500">
+            <p>* 데모 데이터입니다. 실제 API 연결 시 실시간 데이터가 표시됩니다.</p>
+        </div>
+    </div>
+
+    <!-- Chart Modal -->
+    <div id="chartModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-auto fade-in">
+            <!-- Modal Header -->
+            <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div id="modalThumbnail" class="w-12 h-12 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center text-2xl"></div>
+                    <div>
+                        <h2 id="modalTitle" class="text-2xl font-bold text-gray-900"></h2>
+                        <p class="text-sm text-gray-600">구독자 추이 차트 (최근 30일)</p>
+                    </div>
+                </div>
+                <button onclick="closeChart()" class="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Stats -->
+            <div class="p-6 border-b border-gray-200">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg">
+                        <div class="text-sm text-gray-600 mb-1">현재 구독자</div>
+                        <div id="statSubscribers" class="text-2xl font-bold text-gray-900"></div>
+                    </div>
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
+                        <div class="text-sm text-gray-600 mb-1">총 조회수</div>
+                        <div id="statViews" class="text-2xl font-bold text-gray-900"></div>
+                    </div>
+                    <div id="statChangeCard" class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
+                        <div class="text-sm text-gray-600 mb-1">24시간 변화</div>
+                        <div id="statChange" class="text-2xl font-bold flex items-center gap-1"></div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
+                        <div class="text-sm text-gray-600 mb-1">카테고리</div>
+                        <div id="statCategory" class="text-2xl font-bold text-gray-900"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="p-6">
+                <canvas id="chartCanvas" width="800" height="400"></canvas>
+                <div class="mt-6 text-center text-sm text-gray-500">
+                    <p>💡 차트는 최근 30일간의 구독자 추이를 보여줍니다.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let channels = [
+            { id: 1, name: 'T-Series', subscribers: 271000000, views: 257000000000, category: '음악', country: '인도', thumbnail: '🎵', change: 50000, verified: true },
+            { id: 2, name: 'YouTube Movies', subscribers: 181000000, views: 0, category: '영화', country: '미국', thumbnail: '🎬', change: 0, verified: true },
+            { id: 3, name: 'MrBeast', subscribers: 339000000, views: 63000000000, category: '엔터테인먼트', country: '미국', thumbnail: '⚡', change: 120000, verified: true },
+            { id: 4, name: 'Cocomelon', subscribers: 184000000, views: 188000000000, category: '교육', country: '미국', thumbnail: '👶', change: -20000, verified: true },
+            { id: 5, name: 'SET India', subscribers: 179000000, views: 271000000000, category: '엔터테인먼트', country: '인도', thumbnail: '📺', change: 45000, verified: true },
+            { id: 6, name: 'Kids Diana Show', subscribers: 127000000, views: 101000000000, category: '엔터테인먼트', country: '우크라이나', thumbnail: '🎀', change: 30000, verified: true },
+            { id: 7, name: 'Like Nastya', subscribers: 125000000, views: 113000000000, category: '엔터테인먼트', country: '러시아', thumbnail: '🌟', change: 25000, verified: true },
+            { id: 8, name: 'Vlad and Niki', subscribers: 124000000, views: 102000000000, category: '엔터테인먼트', country: '러시아', thumbnail: '👦', change: 28000, verified: true },
+            { id: 9, name: 'Zee Music Company', subscribers: 112000000, views: 82000000000, category: '음악', country: '인도', thumbnail: '🎼', change: 35000, verified: true },
+            { id: 10, name: 'WWE', subscribers: 103000000, views: 84000000000, category: '스포츠', country: '미국', thumbnail: '💪', change: 15000, verified: true }
+        ];
+
+        let selectedChannel = null;
+
+        function formatNumber(num) {
+            if (num >= 1000000000) return (num / 1000000000).toFixed(1) + '억';
+            if (num >= 100000000) return (num / 100000000).toFixed(1) + '억';
+            if (num >= 10000) return (num / 10000).toFixed(0) + '만';
+            return num.toLocaleString();
+        }
+
+        function renderChannels() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const category = document.getElementById('categoryFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+
+            let filtered = channels.filter(channel => 
+                channel.name.toLowerCase().includes(searchTerm) &&
+                (category === '전체' || channel.category === category)
+            );
+
+            filtered.sort((a, b) => {
+                if (sortBy === 'subscribers') return b.subscribers - a.subscribers;
+                if (sortBy === 'views') return b.views - a.views;
+                if (sortBy === 'change') return b.change - a.change;
+                return 0;
+            });
+
+            const listHtml = filtered.map((channel, index) => `
+                <div class="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
+                    <div class="flex items-center gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 flex items-center justify-center">
+                            <span class="text-2xl font-bold ${
+                                index === 0 ? 'text-yellow-500' :
+                                index === 1 ? 'text-gray-400' :
+                                index === 2 ? 'text-orange-600' :
+                                'text-gray-600'
+                            }">${index + 1}</span>
+                        </div>
+
+                        <div class="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center text-3xl">
+                            ${channel.thumbnail}
+                        </div>
+
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <h3 class="text-xl font-bold text-gray-900 truncate">${channel.name}</h3>
+                                ${channel.verified ? '<span class="text-blue-500">✓</span>' : ''}
+                            </div>
+                            <div class="flex flex-wrap gap-3 text-sm text-gray-600">
+                                <span class="flex items-center gap-1">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87m-4-12a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                    ${formatNumber(channel.subscribers)} 구독자
+                                </span>
+                                <span class="flex items-center gap-1">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    ${formatNumber(channel.views)} 조회수
+                                </span>
+                                <span class="px-2 py-0.5 bg-gray-100 rounded">${channel.category}</span>
+                                <span class="text-gray-500">${channel.country}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex-shrink-0 text-right">
+                            <div class="flex items-center gap-1 text-sm font-semibold ${channel.change >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    ${channel.change >= 0 ? 
+                                        '<path d="m3 17 6-6 4 4 8-8M21 7v6h-6"></path>' : 
+                                        '<path d="M3 7l6 6 4-4 8 8m0 0v-6m0 6h-6"></path>'
+                                    }
+                                </svg>
+                                <span>${channel.change >= 0 ? '+' : ''}${formatNumber(Math.abs(channel.change))}</span>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">24시간 변화</div>
+                        </div>
+
+                        <button onclick="openChart(${channel.id})" class="flex-shrink-0 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <line x1="18" y1="20" x2="18" y2="10"></line>
+                                <line x1="12" y1="20" x2="12" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="14"></line>
+                            </svg>
+                            차트
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('rankingList').innerHTML = listHtml;
+        }
+
+        function generateChartData(channel) {
+            const data = [];
+            const now = Date.now();
+            const baseSubscribers = channel.subscribers;
+            
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date(now - i * 24 * 60 * 60 * 1000);
+                const randomChange = Math.floor(Math.random() * 200000) - 50000;
+                const subscribers = baseSubscribers - (i * 50000) + randomChange;
+                
+                data.push({
+                    date: `${date.getMonth() + 1}/${date.getDate()}`,
+                    subscribers: subscribers
+                });
+            }
+            
+            return data;
+        }
+
+        function drawChart(data) {
+            const canvas = document.getElementById('chartCanvas');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const padding = 60;
+
+            ctx.clearRect(0, 0, width, height);
+
+            const maxSubs = Math.max(...data.map(d => d.subscribers));
+            const minSubs = Math.min(...data.map(d => d.subscribers));
+            const range = maxSubs - minSubs;
+
+            // Draw gradient background
+            const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.2)');
+            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.02)');
+
+            // Draw area
+            ctx.beginPath();
+            data.forEach((point, i) => {
+                const x = padding + (i / (data.length - 1)) * (width - padding * 2);
+                const y = height - padding - ((point.subscribers - minSubs) / range) * (height - padding * 2);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.lineTo(width - padding, height - padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Draw line
+            ctx.beginPath();
+            data.forEach((point, i) => {
+                const x = padding + (i / (data.length - 1)) * (width - padding * 2);
+                const y = height - padding - ((point.subscribers - minSubs) / range) * (height - padding * 2);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw axes
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.lineTo(width - padding, height - padding);
+            ctx.stroke();
+
+            // Draw labels
+            ctx.fillStyle = '#666';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            for (let i = 0; i < data.length; i += 5) {
+                const x = padding + (i / (data.length - 1)) * (width - padding * 2);
+                ctx.fillText(data[i].date, x, height - padding + 20);
+            }
+        }
+
+        function openChart(channelId) {
+            selectedChannel = channels.find(c => c.id === channelId);
+            if (!selectedChannel) return;
+
+            document.getElementById('modalThumbnail').textContent = selectedChannel.thumbnail;
+            document.getElementById('modalTitle').textContent = selectedChannel.name;
+            document.getElementById('statSubscribers').textContent = formatNumber(selectedChannel.subscribers);
+            document.getElementById('statViews').textContent = formatNumber(selectedChannel.views);
+            document.getElementById('statCategory').textContent = selectedChannel.category;
+
+            const changeCard = document.getElementById('statChangeCard');
+            if (selectedChannel.change >= 0) {
+                changeCard.className = 'bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg';
+                document.getElementById('statChange').className = 'text-2xl font-bold flex items-center gap-1 text-green-600';
+                document.getElementById('statChange').innerHTML = `
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="m3 17 6-6 4 4 8-8M21 7v6h-6"></path>
+                    </svg>
+                    +${formatNumber(Math.abs(selectedChannel.change))}
+                `;
+            } else {
+                changeCard.className = 'bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg';
+                document.getElementById('statChange').className = 'text-2xl font-bold flex items-center gap-1 text-red-600';
+                document.getElementById('statChange').innerHTML = `
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M3 7l6 6 4-4 8 8m0 0v-6m0 6h-6"></path>
+                    </svg>
+                    ${formatNumber(Math.abs(selectedChannel.change))}
+                `;
+            }
+
+            const chartData = generateChartData(selectedChannel);
+            setTimeout(() => drawChart(chartData), 100);
+
+            document.getElementById('chartModal').classList.remove('hidden');
+        }
+
+        function closeChart() {
+            document.getElementById('chartModal').classList.add('hidden');
+        }
+
+        document.getElementById('searchInput').addEventListener('input', renderChannels);
+        document.getElementById('categoryFilter').addEventListener('change', renderChannels);
+        document.getElementById('sortBy').addEventListener('change', renderChannels);
+
+        setInterval(() => {
+            channels = channels.map(channel => ({
+                ...channel,
+                subscribers: channel.subscribers + Math.floor(Math.random() * 1000),
+                change: channel.change + Math.floor(Math.random() * 100) - 50
+            }));
+            renderChannels();
+        }, 3000);
+
+        renderChannels();
+    </script>
+</body>
+</html>
